@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -47,6 +48,21 @@ typedef struct {
     ssize_t input_length;
 } InputBuffer; // 创建输入buffer数据结构
 
+void* row_slot(Table table, uint32_t row_num) {
+    uint32_t page_num = row_num / ROWS_PER_PAGE;
+    void* page = table.pages[page_num];
+    if (page == NULL) {
+        // 当访问页面不存在时分配内存
+        page = table.pages[page_num] = malloc(PAGE_SIZE);
+    }
+    uint32_t row_offset = row_num % ROWS_PER_PAGE;
+    uint32_t byte_offset = row_offset * ROW_SIZE;
+    return page + byte_offset;
+}
+
+Table* new_table() { // 创建新table
+}
+
 InputBuffer* new_input_buffer() { // 新建输入数据
     InputBuffer* input_buffer = malloc(sizeof(InputBuffer));
     input_buffer->input_length = 0;
@@ -95,7 +111,9 @@ typedef struct {
     Row row_to_insert; //只用于insert操作
 } Statement;
 
-MetaCommandResult  do_meta_command(InputBuffer* input_buffer) { // 执行元命令
+typedef enum { EXECUTE_SUCCESS, EXECUTE_TABLE_FULL } ExecuteResult;
+
+MetaCommandResult do_meta_command(InputBuffer* input_buffer) { // 执行元命令
     if (strcmp(input_buffer->buffer, ".exit") == 0) {
         exit(EXIT_SUCCESS); // TODO: 运行内容
     } else {
@@ -121,7 +139,7 @@ PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement)
     return PREPARE_UNRECOGNIZED_STATEMENT; // 读取失败
 }
 
-void execute_statement(Statement* statement) {
+ExecuteResult execute_statement(Statement* statement) {
     switch (statement->type) {
         case (STATEMENT_INSERT):
             printf("Do insert"); // TODO：这里插入"insert"的操作
